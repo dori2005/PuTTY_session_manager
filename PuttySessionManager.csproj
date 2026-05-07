@@ -14,6 +14,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\app.ico" />
+    <!-- setup/ 폴더는 별도 프로젝트 -->
+    <Compile Remove="setup\**" />
   </ItemGroup>
 
   <!--

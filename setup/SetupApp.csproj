@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>setup</AssemblyName>
+    <RootNamespace>SetupApp</RootNamespace>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 빌드 전에 build-installer.ps1 이 Resources/ 에 복사해놓음 -->
+    <EmbeddedResource Include="Resources\PuttySessionManager.exe"
+                      LogicalName="PuttySessionManager.exe" />
+  </ItemGroup>
+
+</Project>
