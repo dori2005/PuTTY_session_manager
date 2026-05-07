@@ -6,8 +6,13 @@ obj/
 .vs/
 *.lock.json
 
-## 배포 산출물
+## 빌드 산출물 — git에 포함하지 않음
 publish/
+setup.exe
+setup/Resources/PuttySessionManager.exe
+setup/_mainbuild/
+setup/_setupbuild/
+setup/bin/
 
 ## OS
 .DS_Store
