@@ -122,7 +122,7 @@ public partial class MainForm : Form
 
     private void TreeView_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
-        if (e.Node.Tag is not NodeTag { Type: NodeType.Session } tag) return;
+        if (e.Node?.Tag is not NodeTag { Type: NodeType.Session } tag) return;
 
         var session = _allSessions.FirstOrDefault(s => s.RegistryName == (string)tag.Data!);
         if (session is null) return;
@@ -134,8 +134,9 @@ public partial class MainForm : Form
     private void TreeView_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
         if (e.Button != MouseButtons.Right) return;
-        _treeView.SelectedNode = e.Node;
-        ShowContextMenu(e.Node, e.Location);
+        if (e.Node is not { } node) return;
+        _treeView.SelectedNode = node;
+        ShowContextMenu(node, e.Location);
     }
 
     private void TreeView_AfterExpandCollapse(object? sender, TreeViewEventArgs e)
