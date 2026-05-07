@@ -17,6 +17,9 @@ public partial class MainForm : Form
     private enum NodeType { Group, Session, Ungrouped }
     private record NodeTag(NodeType Type, object? Data);
 
+    // 드래그 중 하이라이트된 노드 추적
+    private TreeNode? _dragTarget;
+
     public MainForm() => InitializeComponent();
 
     protected override void OnLoad(EventArgs e)
@@ -32,9 +35,49 @@ public partial class MainForm : Form
     // ── 아이콘 ──────────────────────────────────────────────────────
     private void LoadIcons()
     {
-        // SystemIcons 사용 (외부 리소스 없이)
-        _imageList.Images.Add("group",   SystemIcons.Information.ToBitmap());
-        _imageList.Images.Add("session", SystemIcons.Shield.ToBitmap());
+        _imageList.ImageSize = new Size(16, 16);
+        _imageList.Images.Add("group",   DrawGroupIcon());
+        _imageList.Images.Add("session", DrawSessionIcon());
+
+        // 폼/작업표시줄 아이콘 (exe에 내장된 리소스에서 로드)
+        var stream = typeof(MainForm).Assembly
+            .GetManifestResourceStream("PuttySessionManager.Resources.app.ico");
+        if (stream is not null) Icon = new Icon(stream);
+    }
+
+    private static Bitmap DrawGroupIcon()
+    {
+        var bmp = new Bitmap(16, 16);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        // 폴더 몸통
+        using var fill = new SolidBrush(Color.FromArgb(255, 230, 165, 30));
+        g.FillRectangle(fill, 0, 4, 16, 10);
+        // 폴더 탭
+        using var tab = new SolidBrush(Color.FromArgb(255, 250, 190, 60));
+        g.FillRectangle(tab, 0, 2, 7, 3);
+        // 테두리
+        using var pen = new Pen(Color.FromArgb(180, 160, 100, 0), 1);
+        g.DrawRectangle(pen, 0, 4, 15, 9);
+        return bmp;
+    }
+
+    private static Bitmap DrawSessionIcon()
+    {
+        var bmp = new Bitmap(16, 16);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        // 터미널 배경
+        using var bg = new SolidBrush(Color.FromArgb(255, 20, 20, 20));
+        g.FillRectangle(bg, 0, 0, 16, 16);
+        // 테두리
+        using var pen = new Pen(Color.FromArgb(255, 0, 180, 0), 1);
+        g.DrawRectangle(pen, 0, 0, 15, 15);
+        // ">" 프롬프트
+        using var font  = new Font("Consolas", 7.5f, FontStyle.Bold);
+        using var brush = new SolidBrush(Color.FromArgb(255, 0, 210, 0));
+        g.DrawString(">", font, brush, 1f, 2f);
+        return bmp;
     }
 
     // ── TreeView 구성 ────────────────────────────────────────────────
@@ -154,6 +197,82 @@ public partial class MainForm : Form
             _appData.UngroupedExpanded = node.IsExpanded;
         }
         _storage.Save(_appData);
+    }
+
+    // ── 드래그 앤 드롭 ───────────────────────────────────────────────
+    private void TreeView_ItemDrag(object? sender, ItemDragEventArgs e)
+    {
+        if (e.Item is not TreeNode { Tag: NodeTag { Type: NodeType.Session } } node) return;
+        DoDragDrop(node, DragDropEffects.Move);
+    }
+
+    private void TreeView_DragEnter(object? sender, DragEventArgs e)
+    {
+        e.Effect = e.Data?.GetDataPresent(typeof(TreeNode)) == true
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+    }
+
+    private void TreeView_DragOver(object? sender, DragEventArgs e)
+    {
+        if (e.Data?.GetDataPresent(typeof(TreeNode)) != true) { e.Effect = DragDropEffects.None; return; }
+
+        var pt     = _treeView.PointToClient(new Point(e.X, e.Y));
+        var target = _treeView.GetNodeAt(pt);
+
+        // 이전 하이라이트 제거
+        if (_dragTarget is not null && _dragTarget != target)
+        {
+            _dragTarget.BackColor = Color.Empty;
+            _dragTarget.ForeColor = Color.Empty;
+        }
+
+        var isValidTarget = target?.Tag is NodeTag { Type: NodeType.Group or NodeType.Ungrouped };
+        if (isValidTarget && target is not null)
+        {
+            target.BackColor = SystemColors.Highlight;
+            target.ForeColor = SystemColors.HighlightText;
+            _dragTarget = target;
+            e.Effect    = DragDropEffects.Move;
+        }
+        else
+        {
+            _dragTarget = null;
+            e.Effect    = DragDropEffects.None;
+        }
+    }
+
+    private void TreeView_DragLeave(object? sender, EventArgs e)
+    {
+        if (_dragTarget is null) return;
+        _dragTarget.BackColor = Color.Empty;
+        _dragTarget.ForeColor = Color.Empty;
+        _dragTarget = null;
+    }
+
+    private void TreeView_DragDrop(object? sender, DragEventArgs e)
+    {
+        // 하이라이트 초기화
+        if (_dragTarget is not null)
+        {
+            _dragTarget.BackColor = Color.Empty;
+            _dragTarget.ForeColor = Color.Empty;
+            _dragTarget = null;
+        }
+
+        if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode draggedNode) return;
+        if (draggedNode.Tag is not NodeTag { Type: NodeType.Session } srcTag) return;
+
+        var pt         = _treeView.PointToClient(new Point(e.X, e.Y));
+        var targetNode = _treeView.GetNodeAt(pt);
+        if (targetNode is null) return;
+
+        var regName = (string)srcTag.Data!;
+
+        if (targetNode.Tag is NodeTag { Type: NodeType.Group } dstTag)
+            MoveSessionToGroup(regName, (Guid)dstTag.Data!);
+        else if (targetNode.Tag is NodeTag { Type: NodeType.Ungrouped })
+            RemoveSessionFromGroup(regName);
     }
 
     // ── 우클릭 메뉴 ──────────────────────────────────────────────────

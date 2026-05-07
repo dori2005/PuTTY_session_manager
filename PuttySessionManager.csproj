@@ -9,7 +9,12 @@
     <AssemblyName>PuttySessionManager</AssemblyName>
     <RootNamespace>PuttySessionManager</RootNamespace>
     <Version>1.0.0</Version>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\app.ico" />
+  </ItemGroup>
 
   <!--
     단일 exe 배포 명령:

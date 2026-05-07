@@ -43,7 +43,8 @@ partial class MainForm
             ShowPlusMinus = true,
             HideSelection = false,
             ImageList     = _imageList,
-            Font          = new Font("Segoe UI", 9.5f)
+            Font          = new Font("Segoe UI", 9.5f),
+            AllowDrop     = true
         };
 
         // -- StatusStrip --
@@ -69,6 +70,11 @@ partial class MainForm
         _treeView.NodeMouseClick    += TreeView_NodeMouseClick;
         _treeView.AfterExpand       += TreeView_AfterExpandCollapse;
         _treeView.AfterCollapse     += TreeView_AfterExpandCollapse;
+        _treeView.ItemDrag          += TreeView_ItemDrag;
+        _treeView.DragEnter         += TreeView_DragEnter;
+        _treeView.DragOver          += TreeView_DragOver;
+        _treeView.DragDrop          += TreeView_DragDrop;
+        _treeView.DragLeave         += TreeView_DragLeave;
         KeyDown                     += MainForm_KeyDown;
     }
 }
