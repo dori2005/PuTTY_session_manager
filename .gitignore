@@ -1,0 +1,14 @@
+## C# / .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.lock.json
+
+## 배포 산출물
+publish/
+
+## OS
+.DS_Store
+Thumbs.db
