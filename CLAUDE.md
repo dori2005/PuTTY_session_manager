@@ -15,7 +15,7 @@ PuTTY 세션을 그룹으로 묶어 관리하는 Windows 데스크탑 유틸리�
 
 | 항목 | 내용 |
 |------|------|
-| 언어 | C# (.NET 8) |
+| 언어 | C# (.NET 10) |
 | UI | Windows Forms |
 | 데이터 저장 | `%APPDATA%\PuttySessionManager\groups.json` |
 | 레지스트리 읽기 | `Microsoft.Win32.Registry` |
@@ -80,7 +80,7 @@ dotnet run
 # 단일 exe 배포 (framework-dependent, 작은 크기)
 dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=false
 
-# 단일 exe 배포 (self-contained, 독립 실행)
+# 단일 exe 배포 (self-contained, .NET 10 런타임 포함)
 dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true
 ```
 
