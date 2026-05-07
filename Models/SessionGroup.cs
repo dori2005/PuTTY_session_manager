@@ -14,6 +14,9 @@ public class SessionGroup
     [JsonPropertyName("sessions")]
     public List<string> SessionNames { get; set; } = new();
 
+    [JsonPropertyName("children")]
+    public List<SessionGroup> Children { get; set; } = new();
+
     [JsonPropertyName("isExpanded")]
     public bool IsExpanded { get; set; } = true;
 }
