@@ -140,16 +140,17 @@ public partial class MainForm : Form
 
     private void TreeView_AfterExpandCollapse(object? sender, TreeViewEventArgs e)
     {
-        if (e.Node?.Tag is not NodeTag tag) return;
+        if (e.Node is not { } node) return;
+        if (node.Tag is not NodeTag tag) return;
 
         if (tag.Type == NodeType.Group)
         {
             var group = _appData.Groups.FirstOrDefault(g => g.Id.Equals(tag.Data));
-            if (group is not null) group.IsExpanded = e.Node.IsExpanded;
+            if (group is not null) group.IsExpanded = node.IsExpanded;
         }
         else if (tag.Type == NodeType.Ungrouped)
         {
-            _appData.UngroupedExpanded = e.Node.IsExpanded;
+            _appData.UngroupedExpanded = node.IsExpanded;
         }
         _storage.Save(_appData);
     }
