@@ -9,6 +9,9 @@ obj/
 ## 빌드 산출물 — git에 포함하지 않음
 publish/
 setup.exe
+setup-v*.exe
+*-Setup.zip
+release-notes-*.md
 setup/Resources/PuttySessionManager.exe
 setup/_mainbuild/
 setup/_setupbuild/

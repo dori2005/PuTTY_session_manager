@@ -7,7 +7,7 @@ partial class MainForm
     private ToolStrip       _toolStrip      = null!;
     private ToolStripButton _btnNewGroup    = null!;
     private ToolStripButton _btnRefresh     = null!;
-    private TreeView        _treeView       = null!;
+    private RubberBandTreeView _treeView    = null!;
     private StatusStrip     _statusStrip    = null!;
     private ToolStripStatusLabel _statusLabel = null!;
     private ImageList       _imageList      = null!;
@@ -36,7 +36,7 @@ partial class MainForm
         });
 
         // -- TreeView --
-        _treeView = new TreeView
+        _treeView = new RubberBandTreeView
         {
             Dock          = DockStyle.Fill,
             ShowLines     = true,
@@ -46,6 +46,7 @@ partial class MainForm
             Font          = new Font("Segoe UI", 9.5f),
             AllowDrop     = true
         };
+        _treeView.PostPaint = TreeView_PaintRubberBand;
 
         // -- StatusStrip --
         _statusStrip = new StatusStrip();

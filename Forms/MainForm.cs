@@ -22,9 +22,8 @@ public partial class MainForm : Form
     private readonly List<TreeNode> _selectedNodes = new();
 
     // ── 고무줄 선택 ──────────────────────────────────────────────────
-    private bool      _isRubberBanding;
-    private Point     _rbScreenStart;   // 시작점 (스크린 좌표)
-    private Rectangle _rbScreenRect;    // 현재 사각형 (스크린 좌표)
+    private bool  _isRubberBanding;
+    private Point _rbScreenStart;       // 시작점 (TreeView 클라이언트 좌표)
 
     public MainForm() => InitializeComponent();
 
@@ -85,6 +84,7 @@ public partial class MainForm : Form
         _treeView.BeginUpdate();
         _treeView.Nodes.Clear();
 
+        // 그룹 먼저
         foreach (var group in _appData.Groups)
         {
             var node = BuildGroupNode(group);
@@ -92,22 +92,11 @@ public partial class MainForm : Form
             if (group.IsExpanded) node.Expand();
         }
 
-        var grouped   = new HashSet<string>();
+        // 미분류 세션을 최상위에 바로 표시
+        var grouped = new HashSet<string>();
         CollectAllSessionNames(_appData.Groups, grouped);
-        var ungrouped = _allSessions.Where(s => !grouped.Contains(s.RegistryName)).ToList();
-
-        if (ungrouped.Count > 0)
-        {
-            var ung = new TreeNode($"미분류 ({ungrouped.Count})")
-            {
-                Tag      = new NodeTag(NodeType.Ungrouped, null),
-                ImageKey = "group", SelectedImageKey = "group"
-            };
-            foreach (var s in ungrouped)
-                ung.Nodes.Add(BuildSessionNode(s));
-            _treeView.Nodes.Add(ung);
-            if (_appData.UngroupedExpanded) ung.Expand();
-        }
+        foreach (var s in _allSessions.Where(s => !grouped.Contains(s.RegistryName)))
+            _treeView.Nodes.Add(BuildSessionNode(s));
 
         _treeView.EndUpdate();
         _selectedNodes.Clear();
@@ -239,7 +228,8 @@ public partial class MainForm : Form
         int imgW = (_treeView.ImageList?.ImageSize.Width ?? 16) + 2;
         foreach (TreeNode node in nodes)
         {
-            if (node.Tag is NodeTag { Type: NodeType.Session })
+            // 세션 + 그룹 선택 가능 (미분류는 제외)
+            if (node.Tag is NodeTag { Type: NodeType.Session or NodeType.Group })
             {
                 var b = node.Bounds;
                 var hit = new Rectangle(b.Left - imgW, b.Top, b.Width + imgW, b.Height);
@@ -261,33 +251,29 @@ public partial class MainForm : Form
             && clientPt.Y >= b.Top         && clientPt.Y <= b.Bottom;
     }
 
+    // 고무줄 사각형 (TreeView 클라이언트 좌표). null이면 비표시.
+    private Rectangle? _rbClientRect;
+
     private void TreeView_MouseDown(object? sender, MouseEventArgs e)
     {
         if (e.Button != MouseButtons.Left) return;
 
         var node = _treeView.GetNodeAt(e.Location);
-        // 텍스트 박스 바깥 영역(이름 오른쪽 빈 공간 등)은 빈 공간으로 처리
         if (node is not null && !IsClickInsideNodeBox(node, e.Location))
             node = null;
 
         if (node is not null)
         {
-            // 선택 안 된 노드 클릭 → 기존 선택 해제
-            if (!_selectedNodes.Contains(node))
-            {
-                ClearSelection();
-                UpdateStatus();
-            }
-            // 이미 선택된 노드 클릭 → 선택 유지 (드래그 위해)
+            if (!_selectedNodes.Contains(node)) { ClearSelection(); UpdateStatus(); }
         }
         else
         {
-            // 빈 공간: 고무줄 시작
+            // 빈 공간: 고무줄 시작 (클라이언트 좌표 사용)
             ClearSelection();
+            _treeView.SelectedNode = null;          // 단일 선택 표시도 해제
             _isRubberBanding = true;
-            _rbScreenStart   = _treeView.PointToScreen(e.Location);
-            _rbScreenRect    = Rectangle.Empty;
-            ShowRubberBand();
+            _rbScreenStart   = e.Location;
+            _rbClientRect    = null;
         }
     }
 
@@ -295,99 +281,43 @@ public partial class MainForm : Form
     {
         if (!_isRubberBanding) return;
 
-        // 새 사각형 계산 (스크린 좌표)
-        var cur = _treeView.PointToScreen(e.Location);
-        _rbScreenRect = Rectangle.FromLTRB(
+        var cur = e.Location;
+        var newRect = Rectangle.FromLTRB(
             Math.Min(_rbScreenStart.X, cur.X), Math.Min(_rbScreenStart.Y, cur.Y),
             Math.Max(_rbScreenStart.X, cur.X), Math.Max(_rbScreenStart.Y, cur.Y));
 
-        UpdateRubberBandVisual();
+        // 이전 + 새 영역만 invalidate (전체 repaint X → 깜빡임 X)
+        var prev = _rbClientRect;
+        _rbClientRect = newRect;
+        if (prev is { } p) _treeView.Invalidate(Rectangle.Inflate(p, 2, 2));
+        _treeView.Invalidate(Rectangle.Inflate(newRect, 2, 2));
 
-        // 포함된 세션 노드 하이라이트
-        var clientRect = _treeView.RectangleToClient(_rbScreenRect);
+        // 선택 갱신
         foreach (var n in _selectedNodes.ToList())
-        {
-            n.BackColor = Color.Empty;
-            n.ForeColor = Color.Empty;
-        }
+        { n.BackColor = Color.Empty; n.ForeColor = Color.Empty; }
         _selectedNodes.Clear();
-        SelectNodesInRect(_treeView.Nodes, clientRect);
+        SelectNodesInRect(_treeView.Nodes, newRect);
         UpdateStatus();
     }
 
     private void TreeView_MouseUp(object? sender, MouseEventArgs e)
     {
         if (!_isRubberBanding) return;
-        HideRubberBand();
+        var prev = _rbClientRect;
+        _rbClientRect    = null;
         _isRubberBanding = false;
-        _rbScreenRect    = Rectangle.Empty;
+        if (prev is { } p) _treeView.Invalidate(Rectangle.Inflate(p, 2, 2));
         UpdateStatus();
     }
 
-    // ── 고무줄 시각 표시 (반투명 오버레이 Form) ─────────────────────
-    private RubberBandOverlay? _rbOverlay;
-
-    private void ShowRubberBand()
+    /// <summary>TreeView의 WM_PAINT 이후 고무줄 사각형을 위에 그림. 깜빡임 없음.</summary>
+    private void TreeView_PaintRubberBand(Graphics g)
     {
-        _rbOverlay ??= new RubberBandOverlay { Owner = this };
-        _rbOverlay.Bounds = new Rectangle(-1000, -1000, 1, 1);
-        _rbOverlay.Show(this);
-    }
-
-    private void UpdateRubberBandVisual()
-    {
-        if (_rbOverlay is null) return;
-        if (_rbScreenRect.Width < 1 || _rbScreenRect.Height < 1) { _rbOverlay.Hide(); return; }
-        if (!_rbOverlay.Visible) _rbOverlay.Show(this);
-        // SetBounds로 정확히 픽셀 단위 지정 (Bounds= 보다 안정적)
-        _rbOverlay.SetBounds(_rbScreenRect.X, _rbScreenRect.Y,
-                             _rbScreenRect.Width, _rbScreenRect.Height,
-                             BoundsSpecified.All);
-    }
-
-    private void HideRubberBand() => _rbOverlay?.Hide();
-
-    private sealed class RubberBandOverlay : Form
-    {
-        // chroma-key 색 (절대 안 쓰일 색). Opacity 대신 TransparencyKey로 layered window 회피 → 떨림 제거.
-        private static readonly Color KeyColor = Color.FromArgb(255, 1, 2, 3);
-
-        public RubberBandOverlay()
-        {
-            AutoScaleMode   = AutoScaleMode.None;
-            FormBorderStyle = FormBorderStyle.None;
-            StartPosition   = FormStartPosition.Manual;
-            ShowInTaskbar   = false;
-            TopMost         = true;
-            BackColor       = KeyColor;
-            TransparencyKey = KeyColor;
-            DoubleBuffered  = true;
-            Padding         = Padding.Empty;
-            Margin          = Padding.Empty;
-            MinimumSize     = new Size(1, 1);
-        }
-        protected override bool ShowWithoutActivation => true;
-        protected override CreateParams CreateParams
-        {
-            get
-            {
-                var cp = base.CreateParams;
-                cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE
-                cp.ExStyle |= 0x00000020; // WS_EX_TRANSPARENT (마우스 이벤트 통과)
-                return cp;
-            }
-        }
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            // chroma-key 색으로만 채움 → 시스템이 투명 처리
-            e.Graphics.Clear(KeyColor);
-        }
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            // 2px 두께 파란 테두리만 그리기 (안쪽은 chroma-key → 투명)
-            using var pen = new Pen(Color.FromArgb(255, 0, 120, 215), 2);
-            e.Graphics.DrawRectangle(pen, 1, 1, Math.Max(1, Width - 2), Math.Max(1, Height - 2));
-        }
+        if (_rbClientRect is not { } r || r.Width < 1 || r.Height < 1) return;
+        using var fill = new SolidBrush(Color.FromArgb(40, 0, 120, 215));
+        g.FillRectangle(fill, r);
+        using var pen = new Pen(Color.FromArgb(255, 0, 120, 215), 1);
+        g.DrawRectangle(pen, r.X, r.Y, r.Width - 1, r.Height - 1);
     }
 
     // ── 이벤트 핸들러 ────────────────────────────────────────────────
@@ -435,21 +365,17 @@ public partial class MainForm : Form
         {
             var group = FindGroup(_appData.Groups, (Guid)tag.Data!);
             if (group is not null) group.IsExpanded = node.IsExpanded;
+            _storage.Save(_appData);
         }
-        else if (tag.Type == NodeType.Ungrouped)
-        {
-            _appData.UngroupedExpanded = node.IsExpanded;
-        }
-        _storage.Save(_appData);
     }
 
-    // ── 드래그 앤 드롭 (세션 이동) ──────────────────────────────────
+    // ── 드래그 앤 드롭 (세션/그룹 이동) ─────────────────────────────
     private void TreeView_ItemDrag(object? sender, ItemDragEventArgs e)
     {
         if (e.Item is not TreeNode dragNode) return;
-        if (dragNode.Tag is not NodeTag { Type: NodeType.Session }) return;
+        // 세션 + 그룹만 드래그 (미분류 X)
+        if (dragNode.Tag is not NodeTag { Type: NodeType.Session or NodeType.Group }) return;
 
-        // 다중 선택이면 선택된 세션 전체를 드래그
         var nodes = _selectedNodes.Count > 1 && _selectedNodes.Contains(dragNode)
             ? _selectedNodes.ToList()
             : new List<TreeNode> { dragNode };
@@ -474,14 +400,19 @@ public partial class MainForm : Form
         if (_dragTarget is not null && _dragTarget != target)
         { _dragTarget.BackColor = Color.Empty; _dragTarget.ForeColor = Color.Empty; }
 
-        if (target?.Tag is NodeTag { Type: NodeType.Group or NodeType.Ungrouped })
+        if (target?.Tag is NodeTag { Type: NodeType.Group })
         {
             target.BackColor = SystemColors.Highlight;
             target.ForeColor = SystemColors.HighlightText;
             _dragTarget = target;
             e.Effect    = DragDropEffects.Move;
         }
-        else { _dragTarget = null; e.Effect = DragDropEffects.None; }
+        else
+        {
+            // 빈 공간 또는 세션 위 = 루트(미분류)로 이동
+            _dragTarget = null;
+            e.Effect    = DragDropEffects.Move;
+        }
     }
 
     private void TreeView_DragLeave(object? sender, EventArgs e)
@@ -501,19 +432,68 @@ public partial class MainForm : Form
 
         var pt         = _treeView.PointToClient(new Point(e.X, e.Y));
         var targetNode = _treeView.GetNodeAt(pt);
-        if (targetNode is null) return;
 
         var regNames = draggedNodes
             .Where(n => n.Tag is NodeTag { Type: NodeType.Session })
             .Select(n => (string)((NodeTag)n.Tag!).Data!)
             .ToList();
 
-        if (targetNode.Tag is NodeTag { Type: NodeType.Group } dstTag)
-            foreach (var r in regNames) MoveSessionToGroup(r, (Guid)dstTag.Data!, refresh: false);
-        else if (targetNode.Tag is NodeTag { Type: NodeType.Ungrouped })
+        var groupIds = draggedNodes
+            .Where(n => n.Tag is NodeTag { Type: NodeType.Group })
+            .Select(n => (Guid)((NodeTag)n.Tag!).Data!)
+            .ToList();
+
+        if (targetNode?.Tag is NodeTag { Type: NodeType.Group } dstTag)
+        {
+            var dstId = (Guid)dstTag.Data!;
+            foreach (var r in regNames) MoveSessionToGroup(r, dstId, refresh: false);
+            foreach (var gid in groupIds) MoveGroupToGroup(gid, dstId);
+        }
+        else
+        {
+            // 빈 공간 또는 세션 위에 드롭 = 루트(미분류)로 이동
             foreach (var r in regNames) RemoveSessionFromAll(_appData.Groups, r);
+            foreach (var gid in groupIds) MoveGroupToRoot(gid);
+        }
 
         SaveAndRefresh();
+    }
+
+    /// <summary>그룹을 다른 그룹의 하위로 이동. 자기 자신/자손에게 드롭은 무시.</summary>
+    private void MoveGroupToGroup(Guid groupId, Guid destId)
+    {
+        if (groupId == destId) return;
+
+        var moving = FindGroup(_appData.Groups, groupId);
+        if (moving is null) return;
+
+        // 자기 자손에게 드롭 → cycle. 무시.
+        if (FindGroup(moving.Children, destId) is not null) return;
+
+        var dest = FindGroup(_appData.Groups, destId);
+        if (dest is null) return;
+
+        // 이미 destId의 직계 자식이면 변경 없음
+        if (dest.Children.Contains(moving)) return;
+
+        // 원래 위치에서 제거
+        var src = FindContainer(_appData.Groups, groupId);
+        src?.Remove(moving);
+
+        // 새 부모로 이동
+        dest.Children.Add(moving);
+    }
+
+    /// <summary>그룹을 최상위(루트)로 이동.</summary>
+    private void MoveGroupToRoot(Guid groupId)
+    {
+        var moving = FindGroup(_appData.Groups, groupId);
+        if (moving is null) return;
+        if (_appData.Groups.Contains(moving)) return;   // 이미 루트
+
+        var src = FindContainer(_appData.Groups, groupId);
+        src?.Remove(moving);
+        _appData.Groups.Add(moving);
     }
 
     // ── 우클릭 메뉴 ──────────────────────────────────────────────────
@@ -557,7 +537,7 @@ public partial class MainForm : Form
             }
 
             if (IsInAnyGroup(_appData.Groups, regName))
-                menu.Items.Add("미분류로 이동", null, (_, _) => RemoveSessionFromGroup(regName));
+                menu.Items.Add("그룹에서 제외", null, (_, _) => RemoveSessionFromGroup(regName));
         }
 
         if (menu.Items.Count > 0) menu.Show(_treeView, location);
@@ -661,7 +641,7 @@ public partial class MainForm : Form
     {
         var hasChildren = group.Children.Count > 0 || group.SessionNames.Count > 0;
         var msg = hasChildren
-            ? $"'{group.Name}' 그룹을 삭제합니다.\n하위 그룹은 상위로 이동되고, 세션은 미분류로 이동됩니다."
+            ? $"'{group.Name}' 그룹을 삭제합니다.\n하위 그룹과 세션은 상위로 이동됩니다."
             : $"'{group.Name}' 그룹을 삭제합니다.";
 
         if (MessageBox.Show(msg, "그룹 삭제", MessageBoxButtons.OKCancel, MessageBoxIcon.Question)
