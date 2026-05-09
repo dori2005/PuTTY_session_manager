@@ -75,6 +75,9 @@ partial class MainForm
         _treeView.DragOver          += TreeView_DragOver;
         _treeView.DragDrop          += TreeView_DragDrop;
         _treeView.DragLeave         += TreeView_DragLeave;
+        _treeView.MouseDown         += TreeView_MouseDown;
+        _treeView.MouseMove         += TreeView_MouseMove;
+        _treeView.MouseUp           += TreeView_MouseUp;
         KeyDown                     += MainForm_KeyDown;
     }
 }

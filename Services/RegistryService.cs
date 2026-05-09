@@ -31,4 +31,13 @@ public static class RegistryService
 
         return sessions.OrderBy(s => s.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
+
+    /// <summary>PuTTY 레지스트리에서 세션의 HostName, UserName을 읽는다.</summary>
+    public static (string HostName, string UserName) GetSessionDetails(string registryName)
+    {
+        using var key = Registry.CurrentUser.OpenSubKey($@"{PuttySessionsPath}\{registryName}");
+        var host = key?.GetValue("HostName")?.ToString() ?? "";
+        var user = key?.GetValue("UserName")?.ToString() ?? "";
+        return (host, user);
+    }
 }
