@@ -274,6 +274,7 @@ public partial class MainForm : Form
             _isRubberBanding = true;
             _rbScreenStart   = e.Location;
             _rbClientRect    = null;
+            _treeView.Capture = true;               // 폼 밖까지 마우스 이벤트 받기
         }
     }
 
@@ -306,6 +307,7 @@ public partial class MainForm : Form
         var prev = _rbClientRect;
         _rbClientRect    = null;
         _isRubberBanding = false;
+        _treeView.Capture = false;                  // 캡처 해제
         if (prev is { } p) _treeView.Invalidate(Rectangle.Inflate(p, 2, 2));
         UpdateStatus();
     }

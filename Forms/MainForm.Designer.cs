@@ -39,6 +39,7 @@ partial class MainForm
         _treeView = new RubberBandTreeView
         {
             Dock          = DockStyle.Fill,
+            BorderStyle   = BorderStyle.None,
             ShowLines     = true,
             ShowPlusMinus = true,
             HideSelection = false,
