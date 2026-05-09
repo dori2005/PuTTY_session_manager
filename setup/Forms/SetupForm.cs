@@ -122,8 +122,8 @@ public partial class SetupForm : Form
         using var key = Registry.CurrentUser.CreateSubKey(
             @"Software\Microsoft\Windows\CurrentVersion\Uninstall\PuttySessionManager");
         key.SetValue("DisplayName",     AppName);
-        key.SetValue("DisplayVersion",  "1.0.0");
-        key.SetValue("Publisher",       "dori2");
+        key.SetValue("DisplayVersion",  "0.2.0");
+        key.SetValue("Publisher",       "dori2005");
         key.SetValue("InstallLocation", installDir);
         key.SetValue("DisplayIcon",     $"{exePath},0");
         key.SetValue("UninstallString",
