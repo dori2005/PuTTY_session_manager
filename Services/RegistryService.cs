@@ -40,4 +40,27 @@ public static class RegistryService
         var user = key?.GetValue("UserName")?.ToString() ?? "";
         return (host, user);
     }
+
+    /// <summary>WinSCP 연결에 필요한 전체 세션 정보 (개인키, 포트 포함).</summary>
+    public static SessionConnectionInfo GetSessionConnectionInfo(string registryName)
+    {
+        using var key = Registry.CurrentUser.OpenSubKey($@"{PuttySessionsPath}\{registryName}");
+        if (key is null) return new SessionConnectionInfo();
+
+        return new SessionConnectionInfo
+        {
+            HostName       = key.GetValue("HostName")?.ToString() ?? "",
+            UserName       = key.GetValue("UserName")?.ToString() ?? "",
+            Port           = key.GetValue("PortNumber") is int p ? p : 22,
+            PrivateKeyPath = key.GetValue("PublicKeyFile")?.ToString() ?? ""
+        };
+    }
+}
+
+public class SessionConnectionInfo
+{
+    public string HostName       { get; set; } = "";
+    public string UserName       { get; set; } = "";
+    public int    Port           { get; set; } = 22;
+    public string PrivateKeyPath { get; set; } = "";
 }

@@ -618,8 +618,8 @@ public partial class MainForm : Form
     {
         var session = _allSessions.FirstOrDefault(s => s.RegistryName == registryName);
         if (session is null) return;
-        var (host, user) = RegistryService.GetSessionDetails(registryName);
-        if (!_winScp.Launch(session.DisplayName, host, user)) ShowNotFound("WinSCP");
+        var info = RegistryService.GetSessionConnectionInfo(registryName);
+        if (!_winScp.Launch(session.DisplayName, info)) ShowNotFound("WinSCP");
     }
 
     // ── 그룹 조작 ────────────────────────────────────────────────────
